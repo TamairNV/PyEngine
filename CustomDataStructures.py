@@ -125,3 +125,15 @@ class Node:
         self.data = None
         self.next = None
         self.prev = None
+
+class Transform:
+    camera = None
+    def __init__(self):
+        self.position = Vector2()
+        self.rotation = 0
+        self.scale = Vector2(0.5, 0.5)
+
+
+
+    def update(self):
+        pass
