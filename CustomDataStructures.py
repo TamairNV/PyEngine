@@ -61,6 +61,7 @@ class Colour:
 
 class HashMap:
     def __init__(self):
+        pass
 
 
 class LinkedList:
