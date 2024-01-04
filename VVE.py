@@ -1,52 +1,51 @@
 import pygame
 from typing import TypeVar, Generic
-
-
-class Vector3:
-    def __init__(self, x=0, y=0, z=0):
-        self.x = x
-        self.y = y
-        self.z = z
-
-    def __mul__(self, other):
-        return Vector3(other.x * self.x, other.y * self.y, other.z * self.z)
-
-    def __add__(self, other):
-        return Vector3(other.x + self.x, other.y + self.y, other.z + self.z)
-
-    def __sub__(self, other):
-        return Vector3( self.x - other.x,  self.y - other.y, self.z - other.z)
-
-class Vector2:
-    def __init__(self, x=0.0, y=0.0):
-        self.x = x
-        self.y = y
-
-    def __mul__(self, other):
-        return Vector3(other.x * self.x, other.y * self.y)
-
-    def __add__(self, other):
-        return Vector3(other.x + self.x, other.y + self.y)
-
-    def __sub__(self, other):
-        return Vector3( self.x - other.x,  self.y - other.y)
-
-
-class Colour:
-    def __init__(self, r=0, g=0, b=0, a=255):
-        self.r = r
-        self.g = g
-        self.b = b
-        self.a = a
-
-
+import CustomDataStructures as dataS
 
 class Transform:
+    camera = None
     def __init__(self):
-        self.position = Vector2()
+        self.position = dataS.Vector2()
         self.rotation = 0
-        self.scale = Vector2(0.5, 0.5)
+        self.scale = dataS.Vector2(0.5, 0.5)
 
+
+    def update(self):
+        pass
+class Rigidbody:
+    def __init__(self):
+        self.velocity = dataS.Vector2()
+        self.gravity = dataS.Vector2(0, 980*2)
+        self.mass = 1
+        self.drag = 0.1
+        self.collider = None
+        self.useGravity = False
+        self.transform = None
+        self.obj = None
+        self.maxSpeed = dataS.Vector2(1000,1000)
+        self.deceleration = 5
+
+    def addForce(self, force):
+        self.velocity += force / self.mass
+
+    def update(self):
+
+        if self.collider == None:
+            self.collider = self.obj.getComponent(Collider)
+        self.velocity -= self.velocity * self.drag * Time.deltaTime
+        if self.useGravity:
+            self.velocity += self.gravity * Time.deltaTime
+        self.velocity.x = max(min(self.velocity.x, self.maxSpeed.x), -self.maxSpeed.x)
+        self.velocity.y = max(min(self.velocity.y, self.maxSpeed.y), -self.maxSpeed.y)
+        self.velocity.x -= self.velocity.x * self.deceleration * Time.deltaTime
+        self.velocity.y -= self.velocity.y * self.deceleration * Time.deltaTime
+        self.transform.position += self.velocity * Time.deltaTime
+        if self.collider != None:
+            self.collider.rect.x = self.transform.position.x
+            self.collider.rect.y = self.transform.position.y
+            self.collider.rect.width = self.obj.getComponent(Sprite).originalSize.x * self.transform.scale.x
+            self.collider.rect.height = self.obj.getComponent(Sprite).originalSize.y * self.transform.scale.y
+            self.collider.checkForCollisionsAndMoveBack()
 
 
 class Time:
@@ -62,13 +61,18 @@ class Time:
 class Screen:
 
     def __init__(self, height, width, name):
+
         self.height = height
         self.width = width
         self.name = name
         self.screen = pygame.display.set_mode((width, height))
         pygame.display.set_caption(name)
+        Transform.camera = self
         self.events = pygame.event.get()
         Input.startListening()
+        self.position = dataS.Vector2(0, 0)
+
+
 
 
 
@@ -94,6 +98,7 @@ class GameLoop:
 
 
 
+
             # Your game logic update function
             self.update()
             GameLoop.screen.screen.fill((0,0,0))
@@ -108,6 +113,7 @@ class GameLoop:
     def update(self):
         ActionObj.runUpdates()
         ActionObj.runLateUpdates()
+
         pass
 
     def render(self):
@@ -163,8 +169,7 @@ class Sprite:
 
         self.imageOriginal = pygame.image.load(img)
         self.rectOriginal = self.imageOriginal.get_rect()
-
-        self.originalSize = Vector2(self.rectOriginal.width, self.rectOriginal.height)
+        self.originalSize = dataS.Vector2(self.rectOriginal.width, self.rectOriginal.height)
         Sprite.sprites.append(self)
         self.obj = None
         self.transform = None
@@ -177,21 +182,40 @@ class Sprite:
             sprite.render()
 
     def render(self):
-
         rotatedImage = pygame.transform.rotate(self.imageOriginal, -self.transform.rotation)
         scaledRotatedImage = pygame.transform.scale(rotatedImage,
                                                       (int(self.originalSize.x * self.transform.scale.x),
                                                        int(self.originalSize.y * self.transform.scale.y)))
 
-        rect = scaledRotatedImage.get_rect(center=(self.transform.position.x, self.transform.position.y))
+        rect = scaledRotatedImage.get_rect(center=(self.transform.position.x,self.transform.position.y))
 
+        rect.x -= GameLoop.screen.position.x
+        rect.y -= GameLoop.screen.position.y
         GameLoop.screen.screen.blit(scaledRotatedImage, rect)
+
 class Collider():
     dictColliders = {}
     def __init__(self,rect):
         self.obj = None
         self.transform = None
         self.rect = rect
+        Collider.dictColliders[self] = self.rect
+
+    def checkForCollisions(self):
+        for key in Collider.dictColliders:
+            if key != self:
+                if self.rect.colliderect(key.rect):
+                    return True
+        return False
+
+    def checkForCollisionsAndMoveBack(self):
+        for key in Collider.dictColliders:
+            if key != self:
+                if self.rect.colliderect(key.rect):
+                    self.transform.position = self.transform.position - self.obj.getComponent(Rigidbody).velocity * Time.deltaTime
+                    return True
+        return False
+
 
 class ActionObj:
     actionObjs = []
@@ -218,6 +242,19 @@ class ActionObj:
     def runUpdates():
         for obj in ActionObj.actionObjs:
             obj.update()
+            obj.transform.update()
+            for com in obj.components:
+                if type(com) == Rigidbody:
+                    com.update()
+                    if com.collider != None:
+                        if com.collider.checkForCollisionsAndMoveBack():
+                            com.velocity = dataS.Vector2(0,0)
+                else:
+                    try:
+
+                        com.update()
+                    except:
+                        pass
 
     @staticmethod
     def runLateUpdates():
@@ -237,6 +274,8 @@ class ActionObj:
         pass
 
 
+
+
 class Player(ActionObj):
 
     def __init__(self):
@@ -249,19 +288,21 @@ class Player(ActionObj):
 
     def awake(self):
         print("awake")
-    def update(self):
+    def update(self): # add movement use the rigidbody and the input class with wasd
         if Input.isKeyPressed("w"):
-            self.transform.position.y -= 500 *Time.deltaTime
-        if Input.isKeyPressed("a"):
-            self.transform.position.x -= 500 * Time.deltaTime
-            pass
+            self.getComponent(Rigidbody).addForce(dataS.Vector2(0,-100))
         if Input.isKeyPressed("s"):
-            self.transform.position.y += 500 * Time.deltaTime
-            pass
+            self.getComponent(Rigidbody).addForce(dataS.Vector2(0,100))
+        if Input.isKeyPressed("a"):
+            self.getComponent(Rigidbody).addForce(dataS.Vector2(-100,0))
         if Input.isKeyPressed("d"):
-            self.transform.position.x += 500 * Time.deltaTime
-            pass
-
+            self.getComponent(Rigidbody).addForce(dataS.Vector2(100,0))
+        if Input.getKeyDown("space"):
+            self.getComponent(Rigidbody).addForce(dataS.Vector2(0,-1000))
+        if Input.getKeyDown("escape"):
+            self.getComponent(Rigidbody).useGravity = True
+        pos = (self.transform.position - GameLoop.screen.position)
+        GameLoop.screen.position += dataS.Vector2(pos.x,pos.y) - dataS.Vector2(GameLoop.screen.width/2,GameLoop.screen.height/2)
 
 if __name__ == "__main__":
     game = GameLoop(frameRateCap=60)
@@ -269,15 +310,23 @@ if __name__ == "__main__":
 
     obj2 = ActionObj()
     obj2.addComponent(Sprite("Mario.png"))
-    obj2.transform.scale = Vector2(0.1, 0.1)
-    obj2.transform.position = Vector2(400,300)
-    obj2.getComponent(Sprite).layer = 10
+    #obj2.addComponent(Collider(obj2.getComponent(Sprite).rectOriginal))
+    #obj2.addComponent(Rigidbody())
+    obj2.transform.scale = dataS.Vector2(10, 10)
+    obj2.transform.position = dataS.Vector2(400,300)
+    obj2.getComponent(Sprite).layer = 1
+    #obj2.getComponent(Rigidbody).drag = 10
 
     obj = Player()
     obj.addComponent(Sprite("Mario.png"))
-    obj.transform.position = Vector2(400,300)
-    obj.transform.scale = Vector2(0.1,0.1)
+    obj.addComponent(Collider(obj.getComponent(Sprite).rectOriginal))
+    obj.addComponent(Rigidbody())
+    obj.transform.position = dataS.Vector2(400,100)
+    obj.transform.scale = dataS.Vector2(0.1,0.1)
     obj.getComponent(Sprite).layer = 4
+
+
+
 
     game.run()
 
