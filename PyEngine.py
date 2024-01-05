@@ -2,46 +2,11 @@ import pygame
 from typing import TypeVar, Generic
 import CustomDataStructures as dataS
 import PyPhysics as Physics
-import Time
 import Game
 
 
 
-class Input:
 
-
-    keys = {}
-    numberOfKeys = 0
-    keysPressed = []
-    keysPressedLastFrame = []
-
-    @staticmethod
-    def startListening():
-        Input.numberOfKeys = len(pygame.key.get_pressed())
-        Input.keysPressed = pygame.key.get_pressed()
-        Input.keysPressedLastFrame = pygame.key.get_pressed()
-        for key in range(Input.numberOfKeys - 1):
-            Input.keys[pygame.key.name(key)] = key
-
-    @staticmethod
-    def isKeyPressed(key,pressed = None):
-        if pressed == None:
-            return pygame.key.get_pressed()[Input.keys[key]]
-        return pressed[Input.keys[key]]
-
-    @staticmethod
-    def getKeyDown(key):
-        for event in Game.GameLoop.screen.events:
-            if event.type == pygame.KEYDOWN and Input.isKeyPressed(key):
-                return True
-        return False
-
-    @staticmethod
-    def getKeyUp(key):
-        for event in Game.GameLoop.screen.events:
-            if event.type == pygame.KEYUP and Input.isKeyPressed(key,Input.keysPressedLastFrame):
-                return True
-        return False
 class Sprite:
     sprites = []
 
@@ -62,10 +27,12 @@ class Sprite:
             sprite.render()
 
     def render(self):
+        rectOriginal = self.imageOriginal.get_rect()
+        originalSize = dataS.Vector2(rectOriginal.width, rectOriginal.height)
         rotatedImage = pygame.transform.rotate(self.imageOriginal, -self.transform.rotation)
         scaledRotatedImage = pygame.transform.scale(rotatedImage,
-                                                      (int(self.originalSize.x * self.transform.scale.x),
-                                                       int(self.originalSize.y * self.transform.scale.y)))
+                                                      (int(originalSize.x * self.transform.scale.x),
+                                                       int(originalSize.y * self.transform.scale.y)))
 
         rect = scaledRotatedImage.get_rect(center=(self.transform.position.x,self.transform.position.y))
 
@@ -140,18 +107,18 @@ class Player(ActionObj):
     def awake(self):
         print("awake")
     def update(self): # add movement use the rigidbody and the input class with wasd
-        if Input.isKeyPressed("w"):
+        if Game.Input.isKeyPressed("w"):
             self.getComponent(Physics.Rigidbody).addForce(dataS.Vector2(0, -100))
-        if Input.isKeyPressed("s"):
+        if Game.Input.isKeyPressed("s"):
             self.getComponent(Physics.Rigidbody).addForce(dataS.Vector2(0, 100))
-        if Input.isKeyPressed("a"):
+        if Game.Input.isKeyPressed("a"):
             self.getComponent(Physics.Rigidbody).addForce(dataS.Vector2(-100, 0))
-        if Input.isKeyPressed("d"):
+        if Game.Input.isKeyPressed("d"):
             self.getComponent(Physics.Rigidbody).addForce(dataS.Vector2(100, 0))
-        if Input.getKeyDown("space"):
+        if Game.Input.getKeyDown("space"):
             self.getComponent(Physics.Rigidbody).addForce(dataS.Vector2(0, -1000))
-        if Input.getKeyDown("escape"):
-            self.getComponent(Physics.Rigidbody).useGravity = True
+        if Game.Input.getKeyDown("escape"):
+            self.getComponent(Physics.Rigidbody).useGravity = False
 
         Game.GameLoop.screen.setPosition(self.transform.position)
 
@@ -161,12 +128,12 @@ if __name__ == "__main__":
 
     obj2 = ActionObj()
     obj2.addComponent(Sprite("Mario.png"))
-    #obj2.addComponent(Collider(obj2.getComponent(Sprite).rectOriginal))
-    #obj2.addComponent(Rigidbody())
-    obj2.transform.scale = dataS.Vector2(10, 10)
+    obj2.addComponent(Physics.Collider(obj2.getComponent(Sprite).rectOriginal))
+    obj2.addComponent(Physics.Rigidbody())
+    obj2.transform.scale = dataS.Vector2(0.1, 0.1)
     obj2.transform.position = dataS.Vector2(400,300)
     obj2.getComponent(Sprite).layer = 1
-    #obj2.getComponent(Rigidbody).drag = 10
+    obj2.getComponent(Physics.Rigidbody).drag = 10
 
     obj = Player()
     obj.addComponent(Sprite("Mario.png"))

@@ -2,7 +2,8 @@
 import pygame
 import CustomDataStructures as dataS
 import PyEngine
-import Time
+import Game
+
 class Screen:
 
     def __init__(self, height, width, name):
@@ -14,7 +15,7 @@ class Screen:
         pygame.display.set_caption(name)
         dataS.Transform.camera = self
         self.events = pygame.event.get()
-        PyEngine.Input.startListening()
+        Game.Input.startListening()
         self.position = dataS.Vector2(0, 0)
 
     def getPosition(self):
@@ -33,11 +34,13 @@ class GameLoop:
 
 
 
+
+
     def run(self):
         while True:
-            Time.Time.tick(self.frameRateCap)
+            Time.tick(self.frameRateCap)
             GameLoop.screen.events = pygame.event.get()
-            Time.Input.keysPressed = pygame.key.get_pressed()
+            Input.keysPressed = pygame.key.get_pressed()
 
             # Your game logic update function
             self.update()
@@ -45,7 +48,7 @@ class GameLoop:
             # Your rendering function
             self.render()
 
-            Time.Input.keysPressedLastFrame = pygame.key.get_pressed()
+            Input.keysPressedLastFrame = pygame.key.get_pressed()
             for event in GameLoop.screen.events:
                 if event.type == pygame.QUIT:
                     pygame.quit()
@@ -59,3 +62,46 @@ class GameLoop:
     def render(self):
         PyEngine.Sprite.runRenderUpdates()
         pygame.display.flip()
+class Time:
+
+    clock = pygame.time.Clock()
+    deltaTime = 0
+
+    @staticmethod
+    def tick(frameRateCap):
+        Time.deltaTime = Time.clock.tick(frameRateCap) / 1000.0  # Convert milliseconds to seconds
+class Input:
+
+
+    keys = {}
+    numberOfKeys = 0
+    keysPressed = []
+    keysPressedLastFrame = []
+
+    @staticmethod
+    def startListening():
+        Input.numberOfKeys = len(pygame.key.get_pressed())
+        Input.keysPressed = pygame.key.get_pressed()
+        Input.keysPressedLastFrame = pygame.key.get_pressed()
+        for key in range(Input.numberOfKeys - 1):
+            Input.keys[pygame.key.name(key)] = key
+
+    @staticmethod
+    def isKeyPressed(key,pressed = None):
+        if pressed == None:
+            return pygame.key.get_pressed()[Input.keys[key]]
+        return pressed[Input.keys[key]]
+
+    @staticmethod
+    def getKeyDown(key):
+        for event in GameLoop.screen.events:
+            if event.type == pygame.KEYDOWN and Input.isKeyPressed(key):
+                return True
+        return False
+
+    @staticmethod
+    def getKeyUp(key):
+        for event in GameLoop.screen.events:
+            if event.type == pygame.KEYUP and Input.isKeyPressed(key,Input.keysPressedLastFrame):
+                return True
+        return False
