@@ -66,5 +66,3 @@ if __name__ == "__main__":
     p = Pipe()
 
     game.run()
-
-#this is test folder thing
